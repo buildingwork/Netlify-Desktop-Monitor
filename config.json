@@ -1,0 +1,8 @@
+
+{
+  "SiteUrl": "https://seans.ie",
+  "NetlifyBadgeUrl": "https://api.netlify.com/api/v1/badges/aabc4958-1094-4ec4-b0cb-4a52410252d3/deploy-status",
+  "DashboardUrl": "https://app.netlify.com/projects/seans-hub/deploys",
+  "TimeoutSeconds": 15,
+  "RefreshIntervalSeconds": 60
+}
