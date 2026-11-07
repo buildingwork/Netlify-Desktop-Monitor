@@ -9,9 +9,12 @@ Add-Type -AssemblyName System.Drawing
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# Locate application files
+# Find application folder (PowerShell or compiled EXE)
 if ($PSScriptRoot) {
     $script:AppDirectory = $PSScriptRoot
+}
+elseif ($ScriptRoot) {
+    $script:AppDirectory = $ScriptRoot
 }
 else {
     $script:AppDirectory = [AppDomain]::CurrentDomain.BaseDirectory
@@ -23,9 +26,7 @@ $configPath = Join-Path $script:AppDirectory "config.json"
 if (-not (Test-Path $configPath)) {
     [Windows.Forms.MessageBox]::Show(
         "config.json must be in the same folder as the application.",
-        "Configuration error",
-        "OK",
-        "Error"
+        "Configuration error"
     ) | Out-Null
     exit
 }
@@ -33,7 +34,7 @@ if (-not (Test-Path $configPath)) {
 try {
     $script:Config = Get-Content $configPath -Raw | ConvertFrom-Json
 
-    foreach ($field in @("SiteUrl", "NetlifyBadgeUrl", "DashboardUrl")) {
+    foreach ($field in @("SiteUrl","NetlifyBadgeUrl","DashboardUrl")) {
         if ([string]::IsNullOrWhiteSpace([string]$script:Config.$field)) {
             throw "Missing configuration field: $field"
         }
@@ -49,20 +50,18 @@ try {
         }
     }
 
-    $script:Timeout = [Math]::Max(5, [int]$script:Config.TimeoutSeconds)
-    $script:Interval = [Math]::Max(30, [int]$script:Config.RefreshIntervalSeconds)
+    $script:Timeout = [Math]::Max(5,[int]$script:Config.TimeoutSeconds)
+    $script:Interval = [Math]::Max(30,[int]$script:Config.RefreshIntervalSeconds)
 }
 catch {
     [Windows.Forms.MessageBox]::Show(
         "Configuration error:`r`n$($_.Exception.Message)",
-        "Netlify Desktop Monitor",
-        "OK",
-        "Error"
+        "Netlify Desktop Monitor"
     ) | Out-Null
     exit
 }
 
-# Theme
+# Colours
 $script:Green = [Drawing.Color]::FromArgb(65,190,125)
 $script:Red = [Drawing.Color]::FromArgb(230,85,85)
 $script:Yellow = [Drawing.Color]::FromArgb(235,185,65)
@@ -70,7 +69,7 @@ $script:White = [Drawing.Color]::White
 $script:Grey = [Drawing.Color]::LightGray
 $script:Background = [Drawing.Color]::FromArgb(28,30,38)
 
-# Window
+# Main window
 $script:Form = New-Object Windows.Forms.Form
 $script:Form.Text = "Netlify Desktop Monitor"
 $script:Form.Size = New-Object Drawing.Size(440,410)
@@ -78,7 +77,6 @@ $script:Form.StartPosition = "CenterScreen"
 $script:Form.FormBorderStyle = "FixedDialog"
 $script:Form.MaximizeBox = $false
 $script:Form.BackColor = $script:Background
-$script:Form.Font = New-Object Drawing.Font("Segoe UI",10)
 
 function Add-MonitorLabel {
     param(
@@ -101,6 +99,7 @@ function Add-MonitorLabel {
     return $label
 }
 
+# Header
 Add-MonitorLabel "NETLIFY DESKTOP MONITOR" 20 18 390 35 17 $script:White | Out-Null
 Add-MonitorLabel "LIGHTWEIGHT WEBSITE MONITORING" 22 52 390 22 9 $script:Grey | Out-Null
 
@@ -109,7 +108,7 @@ $script:SiteStatus = Add-MonitorLabel "Website: Not checked" 22 151 390 25 10 $s
 $script:DeployStatus = Add-MonitorLabel "Netlify: Not checked" 22 182 390 25 10 $script:Grey
 $script:LastChecked = Add-MonitorLabel "Last checked: Never" 22 213 390 22 9 $script:Grey
 
-# Buttons
+# Refresh button
 $script:RefreshButton = New-Object Windows.Forms.Button
 $script:RefreshButton.Text = "REFRESH NOW"
 $script:RefreshButton.Location = New-Object Drawing.Point(22,252)
@@ -119,6 +118,7 @@ $script:RefreshButton.ForeColor = $script:White
 $script:RefreshButton.FlatStyle = "Flat"
 $script:Form.Controls.Add($script:RefreshButton)
 
+# Dashboard button
 $script:DashboardButton = New-Object Windows.Forms.Button
 $script:DashboardButton.Text = "NETLIFY DASHBOARD"
 $script:DashboardButton.Location = New-Object Drawing.Point(207,252)
@@ -128,7 +128,7 @@ $script:DashboardButton.ForeColor = $script:White
 $script:DashboardButton.FlatStyle = "Flat"
 $script:Form.Controls.Add($script:DashboardButton)
 
-# Automatic refresh: deliberately OFF
+# Automatic refresh OFF by default
 $script:AutoRefresh = New-Object Windows.Forms.CheckBox
 $script:AutoRefresh.Text = "Enable automatic refresh"
 $script:AutoRefresh.Location = New-Object Drawing.Point(22,316)
@@ -139,15 +139,15 @@ $script:Form.Controls.Add($script:AutoRefresh)
 
 Add-MonitorLabel "Every $($script:Interval) seconds" 270 317 140 22 9 $script:Grey | Out-Null
 
-# Timer is never started automatically
+# Timer exists but is not started
 $script:Timer = New-Object Windows.Forms.Timer
 $script:Timer.Interval = $script:Interval * 1000
 
-# Background worker keeps network activity off the UI thread
+# Background worker
 $script:Worker = New-Object System.ComponentModel.BackgroundWorker
 
 $script:Worker.add_DoWork({
-    param($sender, $e)
+    param($sender,$e)
 
     $settings = $e.Argument
 
@@ -155,9 +155,7 @@ $script:Worker.add_DoWork({
         SiteCode = 0
         SiteReachable = $false
         SiteHealthy = $false
-        SiteError = $null
         DeployStatus = "UNKNOWN"
-        DeployError = $null
     }
 
     # Website check
@@ -187,12 +185,9 @@ $script:Worker.add_DoWork({
                 $result.SiteCode -lt 400
             )
         }
-        else {
-            $result.SiteError = $_.Exception.Message
-        }
     }
 
-    # Netlify badge check
+    # Netlify deployment check
     try {
         $badge = Invoke-WebRequest `
             -Uri $settings.BadgeUrl `
@@ -200,8 +195,6 @@ $script:Worker.add_DoWork({
             -TimeoutSec $settings.Timeout `
             -ErrorAction Stop
 
-        # Netlify identifies its deployment status in
-        # the Content-Disposition filename.
         $disposition = [string]$badge.Headers["Content-Disposition"]
 
         if ($disposition -match '(?i)badge-success') {
@@ -216,20 +209,17 @@ $script:Worker.add_DoWork({
         elseif ($disposition -match '(?i)badge-canceled') {
             $result.DeployStatus = "CANCELED"
         }
-        else {
-            $result.DeployStatus = "UNKNOWN"
-        }
     }
     catch {
-        $result.DeployError = $_.Exception.Message
+        $result.DeployStatus = "ERROR"
     }
 
     $e.Result = [PSCustomObject]$result
 })
 
-# Update interface after the background work completes
+# Background worker completed
 $script:Worker.add_RunWorkerCompleted({
-    param($sender, $e)
+    param($sender,$e)
 
     $script:RefreshButton.Enabled = $true
     $script:RefreshButton.Text = "REFRESH NOW"
@@ -237,7 +227,6 @@ $script:Worker.add_RunWorkerCompleted({
     if ($e.Error) {
         $script:MainStatus.Text = "CHECK ERROR"
         $script:MainStatus.ForeColor = $script:Red
-        $script:LastChecked.Text = $e.Error.Message
         return
     }
 
@@ -270,7 +259,7 @@ $script:Worker.add_RunWorkerCompleted({
             $script:DeployStatus.ForeColor = $script:Yellow
         }
         "CANCELED" {
-            $script:DeployStatus.Text = "Netlify: DEPLOYMENT CANCELED"
+            $script:DeployStatus.Text = "Netlify: CANCELED"
             $script:DeployStatus.ForeColor = $script:Yellow
         }
         default {
@@ -279,29 +268,20 @@ $script:Worker.add_RunWorkerCompleted({
         }
     }
 
-    # Report website health separately from deployment health
-    if (-not $r.SiteReachable) {
-        $script:MainStatus.Text = "SITE UNREACHABLE"
+    if (-not $r.SiteReachable -or -not $r.SiteHealthy) {
+        $script:MainStatus.Text = "SITE UNAVAILABLE"
         $script:MainStatus.ForeColor = $script:Red
-    }
-    elseif (-not $r.SiteHealthy) {
-        $script:MainStatus.Text = "SITE HTTP ERROR"
-        $script:MainStatus.ForeColor = $script:Red
-    }
-    elseif ($r.DeployStatus -eq "FAILED") {
-        $script:MainStatus.Text = "SITE ONLINE / DEPLOY FAILED"
-        $script:MainStatus.ForeColor = $script:Yellow
     }
     elseif ($r.DeployStatus -eq "SUCCESS") {
         $script:MainStatus.Text = "LIVE"
         $script:MainStatus.ForeColor = $script:Green
     }
-    elseif ($r.DeployStatus -eq "BUILDING") {
-        $script:MainStatus.Text = "SITE ONLINE / BUILDING"
+    elseif ($r.DeployStatus -eq "FAILED") {
+        $script:MainStatus.Text = "SITE ONLINE / DEPLOY FAILED"
         $script:MainStatus.ForeColor = $script:Yellow
     }
     else {
-        $script:MainStatus.Text = "SITE ONLINE / DEPLOY UNKNOWN"
+        $script:MainStatus.Text = "SITE ONLINE / CHECK DEPLOY"
         $script:MainStatus.ForeColor = $script:Yellow
     }
 
@@ -310,7 +290,7 @@ $script:Worker.add_RunWorkerCompleted({
     )
 })
 
-# Start a check without blocking the window
+# Start background check
 function Start-StatusCheck {
     if ($script:Worker.IsBusy) {
         return
@@ -328,20 +308,13 @@ function Start-StatusCheck {
     })
 }
 
+# Events
 $script:RefreshButton.Add_Click({
     Start-StatusCheck
 })
 
 $script:DashboardButton.Add_Click({
-    try {
-        Start-Process $script:Config.DashboardUrl
-    }
-    catch {
-        [Windows.Forms.MessageBox]::Show(
-            "Unable to open the Netlify dashboard.",
-            "Error"
-        ) | Out-Null
-    }
+    Start-Process $script:Config.DashboardUrl
 })
 
 $script:AutoRefresh.Add_CheckedChanged({
@@ -362,5 +335,5 @@ $script:Form.Add_FormClosing({
     $script:Timer.Dispose()
 })
 
-# No automatic check at startup
+# Display without automatically checking
 [void]$script:Form.ShowDialog()
