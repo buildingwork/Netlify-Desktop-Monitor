@@ -2,12 +2,12 @@
 @echo off
 title Netlify Desktop Monitor
 
-set "APP_DIR=%~dp0"
+cd /d "%~dp0"
 
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File "%APP_DIR%NetlifyMonitor.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0NetlifyMonitor.ps1"
 
 if errorlevel 1 (
     echo.
-    echo The monitor encountered an error.
+    echo Netlify Desktop Monitor encountered an error.
     pause
 )
