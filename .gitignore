@@ -1,0 +1,33 @@
+
+# Build output
+dist/
+bin/
+obj/
+
+# Generated executables
+*.exe
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.old
+
+# Logs
+*.log
+
+# PowerShell temporary files
+*.ps1xml
+
+# Windows system files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editors
+.vscode/
+.idea/
+.vs/
+
+# macOS
+.DS_Store
