@@ -3,33 +3,42 @@
 
 All notable changes to Netlify Desktop Monitor are documented here.
 
-This project follows a simplified version of Semantic Versioning.
-
-## [1.0.0] - 2026-11-07
+## [Unreleased]
 
 ### Added
-- Initial release of Netlify Desktop Monitor.
-- Lightweight Windows desktop interface.
-- Website availability checking using HTTP requests.
+- Initial Windows desktop monitoring application.
+- Website availability checking.
 - Netlify deployment status monitoring.
-- Configurable website URL and Netlify badge URL.
 - Manual refresh functionality.
-- Optional automatic refresh.
-- Automatic refreshing disabled by default.
-- Configurable request timeout and refresh interval.
-- Netlify deployment dashboard shortcut.
+- Optional automatic refreshing.
+- Configurable website and deployment badge URLs.
+- Netlify dashboard shortcut.
 - PowerShell source distribution.
 - Windows executable build script.
-- MIT open-source licence.
+
+### Improved
+- Background network checks to keep the interface responsive.
+- HTTP response handling.
+- Netlify deployment status detection.
+- Executable configuration file handling.
+- Configuration validation.
 
 ### Performance
+- Automatic refreshing disabled by default.
+- No automatic network checks at startup.
 - No background service.
-- No automatic checks at application startup.
 - No telemetry or user tracking.
-- Minimal resource usage.
+- Prevent overlapping monitoring requests.
 
 ### Documentation
 - Installation instructions.
 - Configuration guide.
-- EXE build instructions.
+- Windows executable build instructions.
 - Troubleshooting guidance.
+- MIT licence.
+
+## Planned
+- Improved deployment status detection.
+- Windows startup shortcut option.
+- Optional system tray integration.
+- Additional monitoring options.
